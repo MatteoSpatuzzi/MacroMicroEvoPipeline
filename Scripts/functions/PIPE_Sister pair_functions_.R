@@ -1,6 +1,6 @@
 #### Tree File #### 
 
-#'\code{MAFFT_run}
+#'\code{tree_analyse}
 #'
 #'@details Analyses monophyly of clades on a tree object according to a given classification
 #'
@@ -132,27 +132,28 @@ pick_sister_Clades <- function(tree_file, info_table, tab_col){
   # if(length(Phy_names_inTree) = 0){
   #   stop("The info_table names do not match the tree_file tips")
   # }
-  # 
+
   Tree_1_phy <- keep.tip(Tree_1,Phy_names_inTree)
   
   Family_vec <- unique(classification[,tab_col])
   
   # Dropping tips to 1 per family
   
-  tips_list_fam <- c()
-  
-  for (fam in Family_vec) {
-    
-    Family_names_vec <- rownames(classification)[which(classification[,tab_col] == fam)]
-    Family_names_vec <- Family_names_vec[which(Family_names_vec %in% Tree_1_phy$tip.label)]
-    tips_list_fam <- append(tips_list_fam, Family_names_vec[1])
-  }
-  Tree_1_per_Family <- keep.tip(Tree_1_phy, tips_list_fam)
-  Tree_1_per_Family$tip.label <- Family_vec
-
+  # tips_list_fam <- c()
+  # 
+  # for (fam in Family_vec) {
+  #   
+  #   Family_names_vec <- rownames(classification)[which(classification[,tab_col] == fam)]
+  #   Family_names_vec <- Family_names_vec[which(Family_names_vec %in% Tree_1_phy$tip.label)]
+  #   tips_list_fam <- append(tips_list_fam, Family_names_vec[1])
+  # }
+  # Tree_1_per_Family <- keep.tip(Tree_1_phy, tips_list_fam)
+  # Tree_1_per_Family$tip.label <- Family_vec
+  Tree_1_per_Family <- Tree_1_phy
   sister_clades <- matrix( ncol = 2)
   
   #Randomise
+  
   viable_families <- sample(Family_vec, length(Family_vec))
   
   while ((length(viable_families) > 1)) {
@@ -164,12 +165,10 @@ pick_sister_Clades <- function(tree_file, info_table, tab_col){
     
     while ((search_complete == FALSE)) {
       #print(viable_families[iter])
-      if(is.monophyletic(Tree_1_per_Family, c(family_1, viable_families[iter]))){
+      if(is.monophyletic(Tree_1_per_Family, c(rownames(classification)[classification[,tab_col] == family_1], rownames(classification)[classification[,tab_col] == viable_families[iter]]))){
         
         sister_clades <- rbind(sister_clades, c(family_1, viable_families[iter])[order(c(family_1, viable_families[iter]))])
         search_complete <- TRUE
-        
-        
         #print("success")
         viable_families <- viable_families[-which(viable_families == family_1 |viable_families == viable_families[iter])]
         
@@ -215,11 +214,15 @@ pick_sister_Clades <- function(tree_file, info_table, tab_col){
 #'
 #'@import ape
 
-sister_clades_stats <- function(sister_mat, info_table, tab_col){
+sister_clades_stats <- function(phy, sister_mat, info_table, tab_col){
   
+  phy_dat <- phy
   sister_list <- sister_mat
   data <- data.frame(matrix(NA, ncol = 8, nrow = dim(sister_list)[1])) 
   classification <- info_table
+  
+  
+  classification <- classification[which(rownames(classification) %in% rownames(phy_dat)),]
   
   Sister_clades_data <- c() 
   for (pair in 1:dim(sister_list)[1]){
@@ -270,7 +273,23 @@ sister_clades_stats <- function(sister_mat, info_table, tab_col){
 #'@import ape
 
 
-reduce_tips <- function(phy, criteria = FALSE, sister_mat, sister_data, info_table, tab_col, tree_file){
+
+# phy = Phylo_genes
+# criteria = con_list$mit
+# sister_mat = sister_clades
+# sister_data = sister_clade_data
+# info_table = classification_amph
+# tab_col = "Family"
+# tree_file = Tree_1_amph
+
+reduce_tips <- function(phy, 
+                        criteria = FALSE, 
+                        tip_threshold = FALSE, 
+                        sister_mat, 
+                        sister_data, 
+                        info_table, 
+                        tab_col, 
+                        tree_file){
   
   Phy_Genes <- phy
   classification <- info_table
@@ -286,7 +305,8 @@ reduce_tips <- function(phy, criteria = FALSE, sister_mat, sister_data, info_tab
     if(group %in% colnames(Phy_Genes)){
       
       Phy_Genes <- Phy_Genes[,group]
-      Phy_Genes <- Phy_Genes[which(apply(Phy_Genes, 1, function(x) any(!str_remove_all(x, "-") == ""))),]
+      Phy_Genes <- Phy_Genes[which(apply(Phy_Genes, 1, function(x) any(!(str_remove_all(x, "-") == "")))),]
+      print("removed")
       
     }else{
       stop("Wrong value for attribute \"criteria\"")
@@ -294,67 +314,86 @@ reduce_tips <- function(phy, criteria = FALSE, sister_mat, sister_data, info_tab
   }
   
   Phy_Genes_equal <- data.frame(matrix(NA, nrow = 0, ncol = dim(Phy_Genes)[2] + 2))
+  
   for (npair in 1:dim(sister_list)[1]){
     
-    sister_pair <- sister_list[npair,]
     
+    sister_pair <- sister_list[npair,]
     tip_list <- list(
-      
       rownames(classification)[which(classification[,tab_col] == sister_pair[1] & rownames(classification) %in% rownames(Phy_Genes))],
       rownames(classification)[which(classification[,tab_col] == sister_pair[2] & rownames(classification) %in% rownames(Phy_Genes))]
     )
     names(tip_list) <- sister_pair
     
-    tips <- c(length(tip_list[[1]]), length(tip_list[[2]]))
-    names(tips) = names(tip_list)
-    max_tips <- max(tips)
-    min_tips <- min(tips)
+    Ntips <- c(length(tip_list[[1]]), length(tip_list[[2]]))
+    names(Ntips) = names(tip_list)
+    
+    max_tips <- max(Ntips)
+    min_tips <- min(Ntips)
     if(min_tips == 0) next
-      
-    if(max(tips) == min(tips)){
+    
+    Phy_Genes_guide <- data.frame(Phy_Genes[which(rownames(Phy_Genes) %in% append(tip_list[[1]],tip_list[[2]])),])
+    if(class(tip_threshold) == "numeric" & min_tips > tip_threshold){
+     
+      min_fam <- names(Ntips)[which(Ntips == min_tips)]
+      Phy_Genes_reduce <- data.frame(Phy_Genes[which(rownames(Phy_Genes) %in% tip_list[[min_fam]]),])
+      min_fam_ordered_tips <- order_by_gene(Phy_Genes_reduce, Phy_Genes_guide)
+      tip_list[[min_fam]] <- tip_list[[min_fam]][tip_list[[min_fam]] %in% names(min_fam_ordered_tips)[1:tip_threshold]]
+      min_tips <- tip_threshold
+      Ntips[min_fam] <- tip_threshold
+    }
+    
+    if(max_tips == min_tips){
       
       Family_reduce <- sister_pair[1]
       Family_keep <- sister_pair[2]
     
       tag_mat <- matrix(c(rep(npair, 2*min_tips), rep(Family_reduce, min_tips), rep(Family_keep, min_tips)), ncol = 2)
-      Phy_Genes_equal <- rbind(Phy_Genes_equal, cbind(tag_mat,Phy_Genes[c(tip_list[[1]],tip_list[[2]]),]))
+      Phy_Genes_equal <- rbind(Phy_Genes_equal, cbind(tag_mat,Phy_Genes[c(tip_list[[1]][1:max_tips],tip_list[[2]][1:min_tips]),]))
       
       
     }else{
       
-      names(max_tips) <- names(tips)[which(tips == max_tips)]
-      names(min_tips) <- names(tips)[which(tips == min_tips)]
+      names(max_tips) <- names(Ntips)[which(Ntips == max_tips)]
+      names(min_tips) <- names(Ntips)[which(Ntips == min_tips)]
       Family_reduce <- names(max_tips)
       tips_reduce <- tip_list[[Family_reduce]]
       Family_keep <- names(min_tips)
       tip_keep <- tip_list[[Family_keep]]
     
     
-    Phy_Genes_reduce <- data.frame(Phy_Genes[which(rownames(Phy_Genes) %in% tips_reduce),])
-    Phy_Genes_reduce[] <- lapply(Phy_Genes_reduce, function(x) ceiling(str_length(str_remove_all(x,"-"))/(str_length(str_remove_all(x,"-"))+1)))
-    Phy_Genes_sum_col <- apply(Phy_Genes_reduce, 2, sum)
-    
-    tag_mat <- matrix(c(rep(npair, 2*min_tips), rep(Family_reduce, min_tips), rep(Family_keep, min_tips)), ncol = 2)
-    
-    tip_scores <- c(rep(0, length(tips_reduce)))
-    names(tip_scores) <- tips_reduce
-    
-    for (i in rownames(Phy_Genes_reduce)) {
-      tip_scores[i] <- sum(Phy_Genes_sum_col[Phy_Genes_reduce[which(rownames(Phy_Genes_reduce) == i),] == 1])
-    } 
-    
-    tip_scores_ordered <- tip_scores[order(tip_scores, decreasing = TRUE)]
-    tip_keep <- append(tip_keep, names(tip_scores_ordered[1:min(tips)]))
-    
-    diff_names <- setdiff(tip_keep, rownames(Phy_Genes))
-    Phy_Genes_equal <- rbind(Phy_Genes_equal, cbind(tag_mat,Phy_Genes[tip_keep,]))
-    row.names(Phy_Genes_equal)[which(str_detect(row.names(Phy_Genes_equal), "NA"))] <- diff_names
+      Phy_Genes_reduce <- data.frame(Phy_Genes[which(rownames(Phy_Genes) %in% tips_reduce),])
+      
+      tip_scores_ordered <- order_by_gene(Phy_Genes_reduce, Phy_Genes_guide)
+      tip_keep <- append(names(tip_scores_ordered[1:min(Ntips)]), tip_keep)
+      
+      tag_mat <- matrix(c(rep(npair, 2*min_tips), rep(Family_reduce, min_tips), rep(Family_keep, min_tips)), ncol = 2)
+      
+      diff_names <- setdiff(tip_keep, rownames(Phy_Genes))
+      Phy_Genes_equal <- rbind(Phy_Genes_equal, cbind(tag_mat,Phy_Genes[tip_keep,]))
+      row.names(Phy_Genes_equal)[which(str_detect(row.names(Phy_Genes_equal), "NA"))] <- diff_names
     }
   
   }
   
   colnames(Phy_Genes_equal)[1:2] <- c("Pair", "Family")
   return(Phy_Genes_equal)
+}
+
+
+
+order_by_gene <- function(dat, guide_dat){
+  
+  Guide_mat <- guide_dat
+  Order_mat <- dat
+  
+  Guide_mat[] <- lapply(Guide_mat, function(x) as.numeric(str_remove_all(x, "-") != ""))
+  Guide_vec <- apply(Guide_mat, 2, sum)
+  
+  Order_mat[] <- lapply(dat, function(x) as.numeric(str_remove_all(x, "-") != ""))
+  tip_scores <- as.matrix(Order_mat) %*% Guide_vec
+  
+  return(tip_scores[order(tip_scores, decreasing = TRUE),1])
 }
 
 

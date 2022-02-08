@@ -2,8 +2,8 @@
 
 #'\code{edit_phylo}
 #'
-#'@details Imports a phylo multiple alignment file and if required breaks it into genes according to a matrix. Such a matrix can be generated with the find_geneloci
-#' function
+#'@details Imports a phylo multiple alignment file and if required breaks it into genes according to a matrix. 
+#' Such a matrix can be generated with the find_geneloci function
 #'
 #'@param phy An object of the phylo class or a dataframe where columns are the genes and the rows are species. 
 #'In the latter case it's important that the column names correspond to the gene names if one wishes to export 

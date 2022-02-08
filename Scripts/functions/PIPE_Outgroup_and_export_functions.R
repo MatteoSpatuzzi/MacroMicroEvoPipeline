@@ -43,36 +43,66 @@
 #'@import seqinr
 #'
 #'
+# phy = Phylo_genes
+# phy_reduced = Phy_genes_reduced_mit
+# criteria = con_list$mit
+# threshold = c(2,2)
+# info_table = classification_sqm
+# tab_col = "Family"
+# tree_file = Tree_1_sqm
+# sister_mat = sister_clades
+# 
+# phy = Phylo_genes
+# phy_reduced = Phy_genes_reduced_nuc
+# threshold = c(2,2)
+# tip_threshold = 10
+# criteria <- con_list$nuc
+# info_table = classification_sqm
+# tab_col = "Family"
+# tree_file = Tree_1_sqm
+# sister_mat = sister_clades 
 
-find_Outgroups <-  function(phy, phy_reduced, threshold = c(3,3), info_table, tab_col, tree_file, sister_mat){
+# phy = Phylo_genes
+# phy_reduced = Phy_genes_reduced_mit
+# criteria = con_list$mit
+# threshold = c(2,2)
+# tip_threshold = 10
+# info_table = classification_sqm
+# tab_col = "Family"
+# tree_file = Tree_1_amph
+# sister_mat = sister_clades
+
+find_Outgroups <-  function(phy, phy_reduced, criteria = FALSE,  threshold = c(3,3), tip_threshold = FALSE, info_table, tab_col, tree_file, sister_mat){
   
   Tree <- tree_file
   classification <- info_table
-  # Phy_genes_reduced_mit <- file
-  # Phy_genes_reduced <- Phy_genes_reduced_mit
   Phy_genes <- phy
   Phy_genes_reduced <- phy_reduced
   
   Family_vec <- unique(classification[,tab_col])
   sister_list <- sister_mat
-  # Phy_names_inTree <- rownames(Phy_genes_reduced)[which(rownames(Phy_genes_reduced) %in% Tree$tip.label)]
-  # Tree_phy <- keep.tip(Tree,Phy_names_inTree)
-  tips_list_fam <- c()
+  group = criteria 
   
-  for (fam in Family_vec) {
-    
-    Family_names_vec <- rownames(classification)[which(classification[,tab_col] == fam)]
-    Family_names_vec <- Family_names_vec[which(Family_names_vec %in% Tree$tip.label)]
-    tips_list_fam <- append(tips_list_fam, Family_names_vec[1])
+  if( group == FALSE){
+    Phy_genes <- Phy_genes
+  }else{
+    if(all(group %in% colnames(Phy_genes))){
+      
+      Phy_genes <- Phy_genes[,group]
+      Phy_genes <- Phy_genes[which(apply(Phy_genes, 1, function(x) !all(str_remove_all(x, "-") == ""))),]
+      print("removed")
+    }else{
+      stop("Wrong value for attribute \"criteria\"")
+    }
   }
-  Tree_1_per_Family <- keep.tip(Tree, tips_list_fam)
-  Tree_1_per_Family$tip.label <- Family_vec
-  
-  
-  ##### Find outgroup #####
   
   Subtrees <- c()
   Subtrees_note <- matrix(ncol= 3, nrow = dim(sister_list)[1])
+  
+  Coph_tree_mat <- cophenetic.phylo(Tree)
+  Coph_tree_fam <- classification[,tab_col][match(rownames(Coph_tree_mat), rownames(classification))]
+  Coph_tree_fam <- Coph_tree_fam[1:dim(Coph_tree_mat)[1]]
+  Coph_tree_mat_add <- cbind(Coph_tree_fam, Coph_tree_mat)
   
   for(pair in 1:dim(sister_list)[1]){
     
@@ -80,42 +110,82 @@ find_Outgroups <-  function(phy, phy_reduced, threshold = c(3,3), info_table, ta
     search_complete <- FALSE
     coverage_threshold <- threshold[1]
     amount_threshold <- threshold[2]
+    Coph_tree_mat_names <- Coph_tree_mat_add
+    
     iter = 1
     
     while(search_complete == FALSE){
+     
+      up_index <- min(max(which(Coph_tree_mat_names[,1] %in% families)) + 1, dim(Coph_tree_mat_names)[1])
+      down_index <- max(min(which(Coph_tree_mat_names[,1] %in% families)) -1 , 1)
+     
+      Families_candidates <- Coph_tree_mat_names[c(up_index,down_index),1]
       
-      outgroup_index <- which(Tree_1_per_Family$tip.label %in% families) + c(-1*iter, iter)
-      outgroups <- Tree_1_per_Family$tip.label[outgroup_index[which(outgroup_index > 0)]]
-      if(any(is.na(outgroups))){
-        outgroups <- outgroups[-which(is.na(outgroups) ==  TRUE)]
+      if(any(Families_candidates %in% families)){
+        Families_candidates <- Families_candidates[-which(Families_candidates %in% families)]
       }
-      cophenetic_outgroups <- cophenetic.phylo(keep.tip(Tree_1_per_Family, tip = append(families, outgroups)))
-      dist_outgroups <- which(cophenetic_outgroups[families[1],] == min(cophenetic_outgroups[outgroups,families[1]]))
-      candidate <- names(dist_outgroups)
+      sum_mat <- matrix(ncol = dim(Phy_genes_reduced[,-c(1,2)])[2], nrow = 0)
       
-      Phy_Genes_reduce <- data.frame(Phy_genes[rownames(classification)[which(classification[,tab_col] == candidate & rownames(classification) %in% rownames(Phy_genes))],colnames(Phy_genes_reduced)[colnames(Phy_genes_reduced)%in%colnames(Phy_genes)]])
-      Phy_Genes_reduce[] <- lapply(Phy_Genes_reduce, function(x) ceiling(str_length(str_remove_all(x,"-"))/(str_length(str_remove_all(x,"-"))+1)))
-      Phy_Genes_sum_col <- apply(Phy_Genes_reduce, 2, function(x) sum(x, na.rm = TRUE))
-      
-      if(sum(Phy_Genes_sum_col > 2) > 2){
-        outgroup <- candidate
-        search_complete <- TRUE
-      }else{
-        iter = iter +1
+      for(i in 1:length(Families_candidates)){
+        
+        names_candidate_1 <- rownames(Coph_tree_mat_names)[which(Coph_tree_mat_names[,1] == Families_candidates[i])]
+        phy_candidate_1 <- phy[which(rownames(phy) %in% names_candidate_1), criteria]
+        if(class(phy_candidate_1) == "character"){
+          
+          phy_candidate_1 <- as.data.frame(matrix(phy_candidate_1, nrow = 1, byrow = TRUE))
+        }
+        
+        phy_candidate_1_bool <- apply(phy_candidate_1, c(1,2), function(x) as.numeric(str_remove_all(x, "-") != ""))
+        phy_candidate_1_bool_sum <- apply(phy_candidate_1_bool,2,FUN = sum)
+        sum_mat <- rbind(sum_mat, phy_candidate_1_bool_sum)
       }
-    }
-
-    subtree_tips <- rownames(classification)[which(classification[,tab_col] %in% families)]
-    subtree_tips <- subtree_tips[subtree_tips %in% rownames(Phy_genes_reduced)]
-    subtree_tips <- append(subtree_tips, rownames(classification)[which(classification[,tab_col] %in% outgroup)])
-    subtree_tips <- subtree_tips[subtree_tips %in% rownames(Phy_genes)]
+      
+       if(any(apply(sum_mat, 1, function(x) sum(sum_mat >= 2) >= 2))){
+         
+         sum_vec <- apply(sum_mat, 1, function(x) sum(x >= 2))
+         candidate_nr <- which(sum_vec == max(sum_vec))
+         
+         if(length(candidate_nr) == 2){
+           
+           sum_vec_2 <- c(sum(sum_mat[1,]),sum(sum_mat[1,]))
+           candidate_nr <- which(sum_vec_2 == max(sum_vec_2))[1]
+         }
+         
+       candidate = Families_candidates[candidate_nr]
+       search_complete <- TRUE
+         
+       }else{
+         
+         Coph_tree_mat_names <- Coph_tree_mat_names[-which(Coph_tree_mat_names[,1] %in% Families_candidates),]
+         iter = iter +1
+         print(pair)
+         print(iter)
+       }
+    } 
     
-    Subtrees_note[pair,] <- append(families, outgroup)
+    subtree_tips <- rownames(Phy_genes_reduced)[which(Phy_genes_reduced$Family %in% families)]
+    subtree_tips <- subtree_tips[which(subtree_tips %in% rownames(Phy_genes_reduced))]
+    
+    outgroup_tips <- rownames(Coph_tree_mat_names)[which(Coph_tree_mat_names[,1] %in% candidate)]
+    
+    if(class(tip_threshold) == "numeric" & length(outgroup_tips) > tip_threshold){
+      
+      Phy_Genes_guide <- data.frame(Phy_genes_reduced[which(Phy_genes_reduced[,1] == pair),-c(1,2)])
+      Phy_Genes_reduce <- data.frame(Phy_genes[which(rownames(Phy_genes) %in% outgroup_tips),criteria])
+      output_ordered_tips <- order_by_gene(Phy_Genes_reduce, Phy_Genes_guide)
+      outgroup_tips <- names(output_ordered_tips[1:min(length(output_ordered_tips),tip_threshold)])
+    }
+    
+    subtree_tips <- append(subtree_tips,outgroup_tips)
+    subtree_tips <- subtree_tips[which(subtree_tips %in% rownames(Phy_genes))]
+    
+    Subtrees_note[pair,] <- append(families, candidate)
     Subtrees[[pair]] <- keep.tip(Tree, subtree_tips)
-
   }
+  
   output_dat <- list(Subtrees, Subtrees_note)
   return(output_dat)
+  
 }
 
 
@@ -152,47 +222,48 @@ find_Outgroups <-  function(phy, phy_reduced, threshold = c(3,3), info_table, ta
 #
 # It Exports fasta files in the wd 
 
-write_subtrees <- function(phy, subtrees_list, subtree_note, concat_list, trim = TRUE){
+write_subtrees <- function(phy, phy_reduced, subtrees_list, subtree_note, criteria = FALSE, trim = TRUE){
   
-  Phy_genes_reduced <- phy
+  Phy_genes <- phy
+  Phy_genes_reduced <- phy_reduced
   wd <- getwd()
-  
   system2("mkdir", args = "subtrees")
   setwd("subtrees")
+  group = criteria
+  print(length(subtrees_list))
   
   for(subtree in 1: length(subtrees_list)){
     
-    if(length(which(Phy_genes_reduced$Pair ==subtree)) == 0 ) next
+    if(length(which(Phy_genes_reduced$Pair == subtree)) == 0 ) next
     
     subtree_tips <- subtrees_list[[subtree]]$tip.label
-    Phy_subtree <- Phy_genes_reduced[which(rownames(Phy_genes_reduced) %in% subtree_tips) ,]
-    Phy_subtree_seq <- phy_concat(Phy_subtree, concat_list)
-
-    rownames(Phy_subtree_seq) <- rownames(Phy_subtree)
+    pair_tips <- rownames(Phy_genes_reduced)[which(Phy_genes_reduced$Family %in% subtree_note[subtree, c(1,2)])]
+    outgroup_tips <- subtree_tips[-which(subtree_tips %in% pair_tips)]
+    
+    Phy_pairs <- Phy_genes_reduced[which(rownames(Phy_genes_reduced) %in% pair_tips),-c(1,2)]
+    Phy_outgroup <- Phy_genes[which(rownames(Phy_genes) %in% outgroup_tips),colnames(Phy_genes_reduced)[-c(1,2)]]
+    Phy_subtree_seq <- phy_concat(rbind(Phy_pairs, Phy_outgroup), group)
+    str_remove_all
     
     if(trim == TRUE & (str_length(Phy_subtree_seq[1,1]) %% 3)!= 0){
-      
       residue <- str_length(Phy_subtree_seq[1,1]) %% 3
       Phy_subtree_seq[,1] <- substr(Phy_subtree_seq[,1],1,str_length(Phy_subtree_seq[1,1])- residue)
-      
     }
     
     dir <- paste("subtree_", subtree_note[subtree,1], "_", subtree_note[subtree,2],"_out_", subtree_note[subtree,3], sep = "")
     system2("mkdir", args = dir)
     setwd(dir)
     
-    write.csv(Phy_subtree, file = dir, row.names = TRUE)
-    write.tree(subtrees_list[[subtree]], file = paste(dir, "_tree.tre", sep = ""))
-    
-    # Nuclear fasta
-    string <- ""
-    for(org in 1:dim(Phy_subtree_seq)[1]){
-      string <- paste(string, ">",rownames(Phy_subtree_seq)[org], "\n",Phy_subtree_seq[org,names(concat_list)], "\n", sep = "" )
+    if(class(criteria) == "list"){
+      dir <- paste(dir, "_", names(criteria))
     }
     
-    filename <- paste(dir,"_", names(concat_list),".fasta",sep = "" )
-    cat(string, file =  filename)
+    write.csv(Phy_subtree_seq, file = paste(dir, ".csv", sep = ""), row.names = TRUE)
+    write.tree(subtrees_list[[subtree]], file = paste(dir, "_tree.tre", sep = ""))
+    write.fasta(as.list(Phy_subtree_seq[,1]), names = rownames(Phy_subtree_seq), file.out = paste(dir, ".fasta", sep = ""), as.string =  TRUE )
+    
     setwd("..")
   }
-  
+  setwd(wd)
 }
+

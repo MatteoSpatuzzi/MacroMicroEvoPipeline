@@ -1,10 +1,11 @@
-WorkingDirectory <- "/Users/darthvader/Desktop/Heidelberg/1_MoBi_Master/Praktikum_Bromham/MacroMicroEvoPipeline/Data/Vertlife_sqm"
-setwd(WorkingDirectory)
+setwd("Data/Pipe_sqm")
 
-#### Classification ####
+#### Classification file ####
+
+# Change the syntax of scientific names to match the phylo file
+# Rownames as Scientific names
 
 classf <- read.csv("squam_shl_new_Classification.csv")
-colnames(classf)[6] <- "Constraint"
 colnames(classf)[7] <- "Scientific.Name"
 classf <- classf[which(classf$Scientific.Name != "Homo sapiens"&classf$Scientific.Name != ""),]
 
