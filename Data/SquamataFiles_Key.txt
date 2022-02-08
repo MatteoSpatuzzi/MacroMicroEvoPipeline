@@ -1,0 +1,41 @@
+“Vertlife” folder
+ 
+sqm_shl_new.phy – 15-gene, 4,061-species alignment
+sqm_shl_new.tre – NNI-optimized ML phylogeny containing 4,061 species, from 15-gene alignment, with SHL support values
+
+sqm_shl_new_Classification.csv – Classification of 7,238 squamata species, indication of data presence/absence, and dimensions of available sequence data
+
+sqm_shl_new_Consensus_7238.tre – Consensus of 10,000 fully-sampled trees from the posterior, containing both data species (4,061) and imputed (3,177)
+
+sqm_shl_new_GenBank.csv – GenBank accession numbers for the 4,061 	species in the 15-gene matrix
+
+squam_shl_new_Posterior_9755.1000.trees – Posterior distributions of 	10,000 fully-sampled dated trees for squamata, containing 7,238 species
+
+From “SupplementaryFiles_key” on http://vertlife.org/data/squamates/
+
+
+“Data” folder
+
+Genbank_sqm.csv - The sqm_shl_new_GenBank.csv file but without the classification columns, only gene ID columns left
+
+classification_tab.csv - a slightly edited version of the sqm_shl_new_Classification.csv file, scientific names have an underscore instead of a space and row names changed to scientific names 
+
+“Results” folder
+
+Phy_Genes.csv - the sequences of the sqm_shl_new.phy alignment split into one column per gene, the scientific name column is now the rownames columns
+Posterior fasta - directory with one fasta file for every gene (column of the Phy_Genes.csv file that contains all multiple alignment sequences for said gene in the  Phy_Genes.csv file
+
+subtrees - directory with one directory for each sister-air + outgroup. Since the code can be run for different set of genes (e.g. mitochondrial and nuclear DNA) the choice of outgrip may or may not differ for the different runs. If that is the case for a given sister pair, a different directory will be generated for it, otherwise all the data will be put into the same. 
+Each directory contains the following files (for each run):
+1) A subtree of the original tree file Tree_1.tre that contains the tips of the sister pairs (trimmed down to the same amount) and the outgroup
+2) The same subtree but originating from the sqm_shl_new_Posterior_7238.1000.tre dated tree file 
+3) A fasta file with the concatenated multiple alignment sequences for the genes chosen for the run (e.g. mitochondrial genes
+Even if the outgroup is the same, the tips trimmed from the larger sister pairs are and fasta files may still differ and as such are written separately for each run
+
+PAML - This directory contains further directories with the PAML output and the results from the analysis of said results by the final functions. 
+1) Result directories from PAML
+2) Directories with the evaluation of the PAML results. These directories contain a .csv file with the coefficients of linear models built out of the PAML results:
+I)Clade size contrast vs Branch length contrast (synonymous mutation rate)
+II)Clade size contrast vs age of the MCRA
+III)Branch length contrast vs age of the MCRA
+They also contain three plots that illustrate said relationships
