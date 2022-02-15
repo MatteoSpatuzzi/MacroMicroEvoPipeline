@@ -30,7 +30,8 @@ classification_amph <- read.csv("classification_tab.csv", row.names = 1)
 
 # tree
 Tree_1_amph <- read.tree("Vertlife/amph_shl_new_Consensus_7238.tre")
-dated_Tree <- read.tree("Vertlife/amph_shl_new_Posterior_7238.1000.trees")
+dated_Tree_amph <- read.tree("Vertlife/amph_shl_new_Posterior_7238.50.trees")
+
 
 # gene mat to split the phylo file correctly
 gene_mat <- matrix(c(
@@ -96,23 +97,51 @@ write_subtrees(Phylo_genes,Phy_genes_reduced_nuc, Subtrees_note_list_nuc[[1]], S
 
 ### PAML Results
 
-setwd("Results")
-PAML_res_dir <- "PAML/baseml"
+setwd("Data/Pipe_amph/Results")
+WorkingDirectory = "PAML"
+setwd(WorkingDirectory)
+
+PAML_res_dir <- "baseml"
 setwd(PAML_res_dir)
 
-New_branch_tree_files_base_nuc <- branch_length_treefiles("nuc", dated_Tree, info_tab = classification_amph, Subtrees_note_list_nuc, Phy_genes_reduced_nuc)
-Nuc_base_contrast <- contrast_calc(New_branch_tree_files_base, TRUE)
-setwd("..")
-setwd("..")
-evaluate_linear_models("amphibia_baseml_nuclear", Nuc_base_contrast, New_branch_tree_files_base)
-setwd("..")
+New_branch_tree_files_base_nuc <- branch_length_treefiles("nuc", dated_Tree_amph, info_tab = classification_amph, Subtrees_note_list_nuc, Phy_genes_reduced_nuc)
+Nuc_base_contrast <- contrast_calc(New_branch_tree_files_base_nuc, 2)
+setwd("../..")
+build_linear_models("amphibia_baseml_nuclear", subs_vs_age =  TRUE, Nuc_base_contrast, New_branch_tree_files_base_nuc)
 
 setwd("baseml")
-New_branch_tree_files_base_mit <- branch_length_treefiles("mit", dated_Tree, info_tab = classification_amph , Subtrees_note_list_mit, Phy_genes_reduced_mit)
-Mit_base_contrast <- contrast_calc(New_branch_tree_files_base, TRUE)
-setwd("..")
-setwd("..")
-evaluate_linear_models("amphibia_baseml_mitochondrial", Mit_base_contrast, New_branch_tree_files_base)
+New_branch_tree_files_base_mit <- branch_length_treefiles("mit", dated_Tree_amph, info_tab = classification_amph , Subtrees_note_list_mit, Phy_genes_reduced_mit)
+Mit_base_contrast <- contrast_calc(New_branch_tree_files_base_mit, 2)
+setwd("../..")
+build_linear_models("amphibia_baseml_mitochondrial", TRUE,  Mit_base_contrast, New_branch_tree_files_base_mit)
+
+
+PAML_res_dir <- "codeml"
+setwd(PAML_res_dir)
+
+New_branch_tree_files_base_nuc <- branch_length_treefiles("nuc/dN", dated_Tree_amph, info_tab = classification_amph, Subtrees_note_list_nuc, Phy_genes_reduced_nuc)
+Nuc_base_contrast <- contrast_calc(New_branch_tree_files_base_nuc, 2)
+setwd("../..")
+build_linear_models("amphibia_codeml_nuclear_dN", subs_vs_age =  TRUE, Nuc_base_contrast, New_branch_tree_files_base_nuc)
+
+New_branch_tree_files_base_nuc <- branch_length_treefiles("nuc/dS", dated_Tree_amph, info_tab = classification_amph, Subtrees_note_list_nuc, Phy_genes_reduced_nuc)
+Nuc_base_contrast <- contrast_calc(New_branch_tree_files_base_nuc, 2)
+setwd("../..")
+build_linear_models("amphibia_codeml_nuclear_dS", subs_vs_age =  TRUE, Nuc_base_contrast, New_branch_tree_files_base_nuc)
+
+
+
+New_branch_tree_files_base_mit <- branch_length_treefiles("mit/dN", dated_Tree_amph, info_tab = classification_amph , Subtrees_note_list_mit, Phy_genes_reduced_mit)
+Mit_base_contrast <- contrast_calc(New_branch_tree_files_base_mit, 2)
+setwd("../..")
+build_linear_models("amphibia_codeml_mitochondrial_dN", TRUE,  Mit_base_contrast, New_branch_tree_files_base_mit)
+
+
+New_branch_tree_files_base_mit <- branch_length_treefiles("mit/dS", dated_Tree_amph, info_tab = classification_amph , Subtrees_note_list_mit, Phy_genes_reduced_mit)
+Mit_base_contrast <- contrast_calc(New_branch_tree_files_base_mit, 2)
+setwd("../..")
+build_linear_models("amphibia_codeml_mitochondrial_dS", TRUE,  Mit_base_contrast, New_branch_tree_files_base_mit)
+
 
 
 
